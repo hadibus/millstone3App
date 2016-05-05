@@ -16,13 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-var events = [{
-    slug: "How to pass class",
-    body: "Do tareas, go to class."
-}, {
-    slug: "How to get swole",
-    body: "Lift with the proteins"
-}];
+
+
+var util = {
+  store: function(namespace, data){
+    if( arguments.length > 1)
+    {
+      return localStorage.setItem(namespace, JSON.stringify(data));
+    } else {
+      var store = localStorage.getItem(namespace);
+      if(store)
+      {
+        return JSON.parse(store);
+      } else {
+        return [];
+      }
+    }
+  }
+};
+
 var app = {
     // Application Constructor
     initialize: function() {
@@ -30,7 +42,7 @@ var app = {
     },
     // Bind Event Listeners
     //
-    // Bind any events that are required on startup. Common events are:
+    // Bind any ev ents that are required on startup. Common ev ents are:
     // 'load', 'deviceready', 'offline', and 'online'.
     bindEvents: function() {
         document.addEventListener('deviceready', this.onDeviceReady, false);
@@ -40,45 +52,77 @@ var app = {
     // The scope of 'this' is the event. In order to call the 'receivedEvent'
     // function, we must explicitly call 'app.receivedEvent(...);'
     onDeviceReady: function() {
-        app.render('container');
-        $('#submit').on('click', app.addEntry);
+        app.posts = util.store('posts');
+        app.loadTemplates();
+        app.render('container', 'entries', {posts: app.posts});
+        app.registerCallbacks();
     },
-    addEntry: function(evt) {
+    loadTemplates: function(){
+      var templates = ['entries', 'addEntryForm', 'entry' ];
+
+      var templateText = '';
+
+      app.templates = {};
+
+      for(var i=0; i<templates.length; i++)
+      {
+        var templateText = document.getElementById(templates[i]).text;
+
+        app.templates[templates[i]] = new EJS({text: templateText});
+      }
+    },
+    registerCallbacks: function(){
+      $('body').on('click', 'a', function(evt){
         evt.preventDefault();
-        console.log("adding Entry?")
-        var slug = $('#slug').val();
-        var body = $('#body').val();
+        history.pushState({}, '', $(this).attr('href'));
+        //render stuff
+        app.route(location.pathname);
+      })
+      $("#container").on('click', '#submit', app.addEntry);
+      $('#container').on('click', '.delete', app.deleteEntry);
+    },
+    route: function(path){
+      console.log('route'+path);
+      if(path === '/add'){
+        console.log('inside');
+        app.render('container', 'addEntryForm', {});
+        return
+      }
+      if(/\/entries\/(\d*)/.test(path) )
+      {
+        var id = parseInt(  path.match(/\/entries\/(\d*)/)[1]  );
+        app.render('container', 'entry', {post: app.posts[id]});
+        return
+      }
+      app.render('container', 'entries', {posts: app.posts});
+    },
+    addEntry: function(evt){
+      evt.preventDefault();
 
-        var entry = {slug: slug, body: body };
-        events.push(entry);
+      var slug = $('#slug').val();
+      var body = $('#body').val();
 
-        app.render('container');
+      var entry = {slug: slug, body: body};
+
+      app.posts.push(entry);
+      util.store('posts', app.posts)
+
+      app.render("container", "entries", {posts: app.posts});
+    },
+    deleteEntry: function(){
+      var entryID = $(this).attr('data-id');
+      app.posts.splice(entryID, 1);
+      util.store('posts', app.posts);
+
+      app.render("container", "entries", {posts: app.posts});
     },
     // Update DOM on a Received Event
-    render: function(id) {
-        var containerElement = document.getElementById(id);
+    render: function(id, template, data) {
+      var containerElement = document.getElementById(id);
 
-        var html = '';
+      var html = app.templates[template].render(data);
 
-        for (var i = 0; i < events.length; i++) {
-            html += '<div><h1>' + events[i].slug + '</h1>'
-            + '<p>' + events[i].body + '</p>'
-            + '<button data-id="' + i + '" class="delete" type = "button">Delete</button></div>';
-        }
-        containerElement.innerHTML = html;
-
-        $(".delete").on('click', function(evt){
-          console.log("Delete" + evt);
-        });
-
-        //var parentElement = document.getElementById(id);
-        //var listeningElement = parentElement.querySelector('.listening');
-        //var receivedElement = parentElement.querySelector('.received');
-
-        //listeningElement.setAttribute('style', 'display:none;');
-        //receivedElement.setAttribute('style', 'display:block;');
-
-        //console.log('Received Event: ' + id);
+      containerElement.innerHTML = html;
     }
 };
 
